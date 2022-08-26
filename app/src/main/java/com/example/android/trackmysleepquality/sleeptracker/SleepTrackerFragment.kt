@@ -38,6 +38,8 @@ import com.google.android.material.snackbar.Snackbar
  */
 class SleepTrackerFragment : Fragment() {
 
+    private lateinit var viewModel: SleepTrackerViewModel
+
     /**
      * Called when the Fragment is ready to display content to the screen.
      *
@@ -56,12 +58,37 @@ class SleepTrackerFragment : Fragment() {
         val dataSource = SleepDatabase.getInstance(application).sleepDatabaseDao
 
         val viewModelFactory = SleepTrackerViewModelFactory(dataSource, application)
-        val viewModel = ViewModelProvider(this, viewModelFactory).get(SleepTrackerViewModel::class.java)
+        viewModel = ViewModelProvider(this, viewModelFactory).get(SleepTrackerViewModel::class.java)
 
         binding.sleepTrackerViewModel = viewModel
 
         binding.lifecycleOwner = this
 
+        // Setup Gridlayout to RecyclerView
+        binding.sleepList.layoutManager = setupGridLayoutManager()
+
+        // Setup RecyclerView Adapter
+        val adapter = SleepNightAdapter(SleepNightAdapter.SleepNightListener { nightId -> viewModel.onSleepNightDataClicked(nightId) })
+        binding.sleepList.adapter = adapter
+
+        setupViewModelObservers(adapter)
+
+        return binding.root
+    }
+
+    private fun setupGridLayoutManager(): GridLayoutManager {
+        val manager = GridLayoutManager(activity, 3)
+        manager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+            override fun getSpanSize(position: Int) = when (position) {
+                0 -> 3
+                else -> 1
+            }
+        }
+
+        return manager
+    }
+
+    private fun setupViewModelObservers(adapter: SleepNightAdapter) {
         viewModel.navigateToSleepQuality.observe(viewLifecycleOwner, Observer { night ->
             night?.let {
                 this.findNavController().navigate(
@@ -84,18 +111,9 @@ class SleepTrackerFragment : Fragment() {
             }
         })
 
-        // Add Gridlayout to RecyclerView
-        val manger = GridLayoutManager(activity, 3)
-        binding.sleepList.layoutManager = manger
-
-        // Setup RecyclerView Adapter
-        val adapter =
-            SleepNightAdapter(SleepNightAdapter.SleepNightListener { nightId -> viewModel.onSleepNightDataClicked(nightId) })
-        binding.sleepList.adapter = adapter
-
         viewModel.nights.observe(viewLifecycleOwner, Observer {
             it?.let {
-                adapter.submitList(it)
+                adapter.addHeaderAndSubmitList(it)
             }
         })
 
@@ -106,7 +124,5 @@ class SleepTrackerFragment : Fragment() {
                 viewModel.doneSleepNightDataNavigation()
             }
         })
-
-        return binding.root
     }
 }
